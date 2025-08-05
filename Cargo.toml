@@ -1,0 +1,11 @@
+[package]
+name = "secrust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+zeroize = "1.8.1"
+aes-gcm = { version = "0.10.3", optional = true }
+
+[features]
+impl = ["dep:aes-gcm"]
