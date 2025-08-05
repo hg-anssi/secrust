@@ -62,6 +62,24 @@ impl<Data: Zeroize> Secret<Data> {
         // More information on Rust [pin](https://doc.rust-lang.org/std/pin/index.html#choosing-pinning-not-to-be-structural-for-field) module
         unsafe { self.get_unchecked_mut().data.deref_mut() }
     }
+
+    /// The only way to access self is by pinning it.
+    pub fn read_with<A, Reader>(self: Pin<&Secret<Data>>, reader: &Reader) -> A
+    where
+        Reader: SecretReader<Data, A>,
+        Data: Unsizeable,
+    {
+        reader.read(self._get().get_unsized())
+    }
+
+    /// The only way to access self is by pinning it.
+    pub fn update_with<A, Updater>(self: Pin<&mut Secret<Data>>, updater: &Updater) -> A
+    where
+        Updater: SecretUpdater<Data, A>,
+        Data: Unsizeable,
+    {
+        updater.update(self._get_mut().get_unsized_mut())
+    }
 }
 /// This trait makes it possible to work on unsized types instead of
 /// sized one. This prevent unattended copies of sensible data on the stack.
@@ -129,10 +147,23 @@ pub trait SecretReader<Data: Zeroize + Unsizeable, A> {
     /// Cloning or moving returned array is *unsecure* because
     /// it could result in secret not being erased after use.
     fn read(&self, sec: &Data::Unsized) -> A;
+}
 
-    /// The only way to access self is by pinning it.
-    fn with_secret(&self, sec: Pin<&Secret<Data>>) -> A {
-        self.read(sec._get().get_unsized())
+impl<T, Data: Zeroize + Unsizeable, A> SecretReader<Data, A> for T
+where
+    T: Fn(&Data::Unsized) -> A,
+{
+    fn read(&self, sec: &Data::Unsized) -> A {
+        self(sec)
+    }
+}
+
+impl<T, Data: Zeroize + Unsizeable, A> SecretUpdater<Data, A> for T
+where
+    T: Fn(&mut Data::Unsized) -> A,
+{
+    fn update(&self, sec: &mut Data::Unsized) -> A {
+        self(sec)
     }
 }
 
@@ -158,11 +189,6 @@ pub trait SecretUpdater<Data: Zeroize + Unsizeable, A> {
     /// Cloning or moving returned array is *unsecure* because
     /// it could result in secret not being erased after use.
     fn update(&self, sec: &mut Data::Unsized) -> A;
-
-    /// The only way to access self is by pinning it.
-    fn update_secret(&self, sec: Pin<&mut Secret<Data>>) -> A {
-        self.update(sec._get_mut().get_unsized_mut())
-    }
 }
 
 #[cfg(test)]

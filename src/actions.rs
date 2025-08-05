@@ -48,7 +48,8 @@ impl<const N: usize> SecretReader<[u8; N], Result<Vec<u8>, aes_gcm::Error>> for 
 
 #[cfg(test)]
 mod test {
-    use std::pin::{Pin, pin};
+
+    use std::pin::pin;
 
     use crate::api::Secret;
 
@@ -58,14 +59,17 @@ mod test {
     fn test() {
         let secret: Secret<[u8; 32]> = Secret::new();
         let mut secret_pinned = pin!(secret);
-        UpdateSecretFromFile("./test/key".into())
-            .update_secret(secret_pinned.as_mut())
+        secret_pinned
+            .as_mut()
+            .update_with(&UpdateSecretFromFile("./test/key".into()))
             .unwrap();
-        let ciphered_message = Cipher("secret message!!!".as_bytes().to_vec())
-            .with_secret(secret_pinned.as_ref())
+        let ciphered_message = secret_pinned
+            .as_ref()
+            .read_with(&Cipher("secret message!!!".as_bytes().to_vec()))
             .unwrap();
-        let decipher = Decipher(ciphered_message)
-            .with_secret(secret_pinned.as_ref())
+        let decipher = secret_pinned
+            .as_ref()
+            .read_with(&Decipher(ciphered_message))
             .unwrap();
         assert_eq!("secret message!!!", String::from_utf8_lossy(&decipher));
     }
