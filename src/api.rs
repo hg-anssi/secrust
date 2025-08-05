@@ -167,24 +167,22 @@ pub trait SecretUpdater<Data: Zeroize + Unsizeable, A> {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        pin::{Pin, pin},
-        rc::Rc,
-        sync::Arc,
-    };
 
     use crate::api::Secret;
 
-    use super::*;
-
     #[test]
-    const fn test_if_unit_rc_is_not_sync() {
-        trait AmbiguousIfSync<T> {
-            const TEST_NOT_SYNC: () = ();
+    fn test_if_secret_is_unpin() {
+        trait CheckUnpin<const IS_UNPIN: bool> {
+            fn is_unpin() -> bool {
+                IS_UNPIN
+            }
         }
-        impl<T: ?Sized> AmbiguousIfSync<((), ())> for T {}
-        impl<T: ?Sized + Sync> AmbiguousIfSync<()> for T {}
-        let _ = <Rc<()>>::TEST_NOT_SYNC;
-        // let _ = <Arc<()>>::TEST_NOT_SYNC;
+
+        impl<T> CheckUnpin<false> for T {}
+        impl<T: Unpin> CheckUnpin<true> for T {}
+
+        type SecretByte = Secret<u8>;
+
+        SecretByte::is_unpin(); // compile time error if Secret is unpin (because call to is_unpin is ambiguous)
     }
 }
